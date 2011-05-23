@@ -1,4 +1,4 @@
-CPPFLAGS += -fPIC -ggdb -Werror -Wall -O3 -DPROF_ENABLED -pg
+CPPFLAGS += -fPIC -ggdb -Werror -Wall -O0 -DPROF_ENABLED -pg
 LIB_SRCS := spinlock.cpp
 LIB_OBJS := $(patsubst %.cpp,%.o, $(LIB_SRCS))
 LIB_ASM  := $(patsubst %.o,%.s, $(LIB_OBJS))
