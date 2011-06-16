@@ -1,0 +1,14 @@
+This is a simple userlevel spinlock implementation primarily to illustrate the
+difference between TAS ( Test And Set ) and ( Test Test and Set ) idioms of
+locking. It is specific to x86.
+
+
+COMPILE : 
+
+	To compile simply run make clean all.
+        Please note that the code makes use of a lot of new API functions in
+	both libc and libpthread. So make sure you are running a fairly recent
+        Linux distro. I built it on Fedora 14.
+
+
+
