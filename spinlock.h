@@ -3,6 +3,12 @@
 
 #include <stdint.h>
 
+/* This is the lock class that  performs locking in 2 different ways:
+ * TAS : Test and Set
+ * TTAS: Test Test and Set.
+ */
+
+
 class spin_lock {
  //   char pad[ 128 - sizeof(uint32_t) - sizeof(void*)];
     volatile uint32_t _lock_word;

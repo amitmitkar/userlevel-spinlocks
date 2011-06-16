@@ -1,3 +1,13 @@
+/* Simple Program to test and time the spinlock implementation.
+ * Basically, it has a global counter that is incremented under a spinlock
+ * by each thread.
+ * The user can specify the number of threads to be created and the type
+ * of lock ( TAS/TTAS ) that should be used.
+ *
+ * Author : Amit Mitkar
+ */
+
+
 #include "spinlock.h"
 #include <pthread.h>
 #include <unistd.h>
@@ -23,7 +33,14 @@ const uint32_t TMAXCOUNT = 4294967294UL >> 14;
 bool tas = false;
 int cache_line = 64;
 
-/*Per thread context structure.*/
+/* Per thread context structure.
+ * Each thread shares the lock and the count.
+ * The count is updated under the lock for every 
+ * iteration.
+ * The other variables are only updated once at the end of 
+ * the thread function.
+ */
+
 struct context{
         string       id;
         spin_lock   *spl;
@@ -34,6 +51,11 @@ struct context{
         struct itimerval itimer;
         struct rusage ru;
 };
+
+/*  This function simply uses the CPU for a short while.
+ *  It will be called with the lock held to cause other
+ *  the threads to wait (i.e. spin)
+ */
 
 uint64_t use_up_cpu(uint64_t iters)
 {
@@ -55,10 +77,18 @@ uint32_t nthreads = 0;
 spin_lock spl __attribute__((aligned(128)));
 pthread_cond_t start_signal;
 pthread_mutex_t start_mut;
-
 int thr_start_count = 0;
 pthread_cond_t  all_threads_started;
 
+
+/* This function is called by the thread function immediately upon startup.
+ * Its purpose it to make all threads wait till the main function completes
+ * creation of all the threads. The last thread created will perform a broadcast
+ * that will help the main thread know all threads are created, running and now
+ * waiting to be signalled to start further execution.
+ * After this the main thread broadcasts a signal ( see start_threads() ) and the 
+ * threads enter the loop inside the thread function.
+ */
 void wait_for_start(int nthreads)
 {
         pthread_mutex_lock(&start_mut);
@@ -74,6 +104,30 @@ void wait_for_start(int nthreads)
         }
         pthread_mutex_unlock(&start_mut);
 }
+
+/* This macro is the (meat of) the thread function.
+ * It just takes the type of lock that needs to be taken (TAS/TTAS)
+ * Here is an explanation of what it does.
+ * - Initialize the thread context.
+ * - Wait for all the threads to be created and started.
+ * - Enter the loop.
+ * - Take the lock ( using the type parameter ).
+ * - If the global counter has reached TMAXCOUNT unlock and break from the loop.
+ * - If not, increment the global counter, local ops.
+ * - Use up the cpu : ( so that the other threads will spin for the lock a bit,
+ *   			see below for more information ).
+ * - unlock and repeat the loop.
+ * - after the loop, update the context with ops and the timing info.
+ * MORE DETAILS about use_up_cpu : 
+ * The use_up_cpu simply hogs the CPU for a bit. Its called with the lock held.
+ * Thus the other threads will spend a bit of time spinning on their locks.
+ * This is essential because, in the absence of the CPU hog, the current thread
+ * releases the lock right away and the  other threads  will get their locks 
+ * almost without any spinning.
+ * It becomes rather hard to illustrate the timing difference between TAS and 
+ * TTAS in that case. Infact, my profiling experiments showed TAS to be faster
+ * if the use_up_cpu call is removed. */
+
 
 #define do_thr_func(locktype)  do {                 \
         struct context *pctx = (struct context*)parg;   \
@@ -125,6 +179,11 @@ void usage(void)
                         "test_lock <tas|ttas> num_threads\n");
 }
 
+/* This function simply creates the given number of threads
+ * and binds them to the CPUs present in a round robin fashion.
+ * The fancy term for this is "setting the thread's CPU affinity".
+ */
+
 void init_threads(const int &ncpus,
                 vector<pthread_t> &tvec,
                 vector<pthread_attr_t> &avec,
@@ -168,6 +227,9 @@ void init_threads(const int &ncpus,
         }
 }
 
+/* This function waits for all the threads to begin running and come to waiting for the start signal.
+ * It then broadcasts a signal that starts all the threads.
+ */
 void start_threads(int nthreads)
 {
         pthread_mutex_lock(&start_mut);
@@ -178,6 +240,7 @@ void start_threads(int nthreads)
                         break;
         }
         thread_start = true;
+	/* Let the RACES BEGIN !!!!!!!!!!!! */
         pthread_cond_broadcast(&start_signal);
         pthread_mutex_unlock(&start_mut);
 }

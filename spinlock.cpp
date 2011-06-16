@@ -19,6 +19,9 @@ spin_lock::lock_tas(void *owner)
         while(!__sync_bool_compare_and_swap_4(lp, 0, 1));
 }
 
+/* The unlock inserts a barrier so that the subsequent loads & previous stores
+ * are completed in the right order.
+ */
 void
 spin_lock::unlock(void *owner)
 {
