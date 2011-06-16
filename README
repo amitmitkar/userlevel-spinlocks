@@ -10,5 +10,4 @@ COMPILE :
 	both libc and libpthread. So make sure you are running a fairly recent
         Linux distro. I built it on Fedora 14.
 
-
-
+URL : This project will be hosted on GitHub @ https://github.com/amitmitkar/userlevel-spinlocks
